@@ -11,7 +11,7 @@ import (
 
 const createTodo = `-- name: CreateTodo :one
 INSERT INTO todos (id, text, done, user_id)
-VALUES (?, ?, ?, ?)
+VALUES ($1, $2, $3, $4)
 RETURNING id, text, done, user_id
 `
 
@@ -23,7 +23,7 @@ type CreateTodoParams struct {
 }
 
 func (q *Queries) CreateTodo(ctx context.Context, arg CreateTodoParams) (Todo, error) {
-	row := q.db.QueryRowContext(ctx, createTodo,
+	row := q.db.QueryRow(ctx, createTodo,
 		arg.ID,
 		arg.Text,
 		arg.Done,
@@ -40,11 +40,12 @@ func (q *Queries) CreateTodo(ctx context.Context, arg CreateTodoParams) (Todo, e
 }
 
 const getTodos = `-- name: GetTodos :many
-SELECT id, text, done, user_id FROM todos
+SELECT id, text, done, user_id
+FROM todos
 `
 
 func (q *Queries) GetTodos(ctx context.Context) ([]Todo, error) {
-	rows, err := q.db.QueryContext(ctx, getTodos)
+	rows, err := q.db.Query(ctx, getTodos)
 	if err != nil {
 		return nil, err
 	}
@@ -62,22 +63,8 @@ func (q *Queries) GetTodos(ctx context.Context) ([]Todo, error) {
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 	return items, nil
-}
-
-const getUser = `-- name: GetUser :one
-SELECT id, name FROM users WHERE id = ?
-`
-
-func (q *Queries) GetUser(ctx context.Context, id string) (User, error) {
-	row := q.db.QueryRowContext(ctx, getUser, id)
-	var i User
-	err := row.Scan(&i.ID, &i.Name)
-	return i, err
 }

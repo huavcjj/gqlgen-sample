@@ -6,32 +6,65 @@ package graph
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
+	"github.com/google/uuid"
 	"gqlgen-todos/graph/model"
-	"math/big"
+	"gqlgen-todos/internal/db"
 )
 
 // CreateTodo is the resolver for the createTodo field.
 func (r *mutationResolver) CreateTodo(ctx context.Context, input model.NewTodo) (*model.Todo, error) {
-	randNumber, _ := rand.Int(rand.Reader, big.NewInt(100))
-	todo := &model.Todo{
-		Text: input.Text,
-		ID:   fmt.Sprintf("T%d", randNumber),
-		User: &model.User{ID: input.UserID, Name: "user" + input.UserID},
+	id := uuid.NewString()
+
+	todo, err := r.Resolver.DB.CreateTodo(ctx, db.CreateTodoParams{
+		ID:     id,
+		Text:   input.Text,
+		Done:   false,
+		UserID: input.UserID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to insert todo: %w", err)
 	}
-	r.todos = append(r.todos, todo)
-	return todo, nil
+
+	return &model.Todo{
+		ID:     todo.ID,
+		Text:   todo.Text,
+		Done:   todo.Done,
+		UserID: todo.UserID,
+	}, nil
 }
 
 // Todos is the resolver for the todos field.
 func (r *queryResolver) Todos(ctx context.Context) ([]*model.Todo, error) {
-	return r.todos, nil
+	todos, err := r.Resolver.DB.GetTodos(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query todos: %w", err)
+	}
+
+	var models []*model.Todo
+	for _, todo := range todos {
+		models = append(models, &model.Todo{
+			ID:     todo.ID,
+			Text:   todo.Text,
+			Done:   todo.Done,
+			UserID: todo.UserID,
+		})
+	}
+
+	return models, nil
 }
 
 // User is the resolver for the user field.
 func (r *todoResolver) User(ctx context.Context, obj *model.Todo) (*model.User, error) {
-	return &model.User{ID: obj.UserID, Name: "user " + obj.UserID}, nil
+	user, err := r.Resolver.DB.GetUser(ctx, obj.UserID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find user (id=%s): %w", obj.UserID, err)
+	}
+
+	return &model.User{
+		ID:   user.ID,
+		Name: user.Name,
+	}, nil
 }
 
 // Mutation returns MutationResolver implementation.

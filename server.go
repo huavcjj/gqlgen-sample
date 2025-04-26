@@ -32,9 +32,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("unable to connect to database: %v", err)
 	}
-	defer conn.Close(ctx)
+	defer func(conn *pgx.Conn, ctx context.Context) {
+		err = conn.Close(ctx)
+		if err != nil {
 
-	if _, err := conn.Exec(ctx, ddl); err != nil {
+		}
+	}(conn, ctx)
+
+	if _, err = conn.Exec(ctx, ddl); err != nil {
 		log.Fatalf("failed to initialize schema: %v", err)
 	}
 
